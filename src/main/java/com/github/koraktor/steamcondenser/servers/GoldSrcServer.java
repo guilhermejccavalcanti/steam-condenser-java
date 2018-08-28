@@ -4,12 +4,11 @@
  *
  * Copyright (c) 2008-2013, Sebastian Staudt
  */
-
 package com.github.koraktor.steamcondenser.servers;
 
 import java.net.InetAddress;
 import java.util.concurrent.TimeoutException;
-
+import com.github.koraktor.steamcondenser.exceptions.RCONNoAuthException;
 import com.github.koraktor.steamcondenser.exceptions.SteamCondenserException;
 import com.github.koraktor.steamcondenser.servers.sockets.GoldSrcSocket;
 
@@ -62,8 +61,7 @@ public class GoldSrcServer extends GameServer {
      * @param port The port the server is listening on
      * @throws SteamCondenserException if initializing the socket fails
      */
-    public GoldSrcServer(String address, Integer port)
-            throws SteamCondenserException {
+    public GoldSrcServer(String address, Integer port) throws SteamCondenserException {
         this(address, port, false);
     }
 
@@ -78,10 +76,8 @@ public class GoldSrcServer extends GameServer {
      *        determine if the server is a HLTV server
      * @throws SteamCondenserException if initializing the socket fails
      */
-    public GoldSrcServer(String address, Integer port, boolean isHLTV)
-            throws SteamCondenserException {
+    public GoldSrcServer(String address, Integer port, boolean isHLTV) throws SteamCondenserException {
         super(address, port);
-
         this.isHLTV = isHLTV;
     }
 
@@ -106,8 +102,7 @@ public class GoldSrcServer extends GameServer {
      * @param port The port the server is listening on
      * @throws SteamCondenserException if initializing the socket fails
      */
-    public GoldSrcServer(InetAddress address, Integer port)
-            throws SteamCondenserException {
+    public GoldSrcServer(InetAddress address, Integer port) throws SteamCondenserException {
         this(address, port, false);
     }
 
@@ -122,10 +117,8 @@ public class GoldSrcServer extends GameServer {
      *        used to determine if the server is a HLTV server
      * @throws SteamCondenserException if initializing the socket fails
      */
-    public GoldSrcServer(InetAddress address, Integer port, boolean isHLTV)
-            throws SteamCondenserException {
+    public GoldSrcServer(InetAddress address, Integer port, boolean isHLTV) throws SteamCondenserException {
         super(address, port);
-
         this.isHLTV = isHLTV;
     }
 
@@ -147,10 +140,16 @@ public class GoldSrcServer extends GameServer {
      *         this method always returns <code>true</code>
      * @see #rconExec
      */
-    public boolean rconAuth(String password) {
+    public boolean rconAuth(String password) throws SteamCondenserException, TimeoutException {
         this.rconPassword = password;
-
-        return true;
+        try {
+            this.rconAuthenticated = true;
+            this.rconExec("");
+        } catch (RCONNoAuthException e) {
+            this.rconAuthenticated = false;
+            this.rconPassword = null;
+        }
+        return this.rconAuthenticated;
     }
 
     /**
@@ -162,9 +161,15 @@ public class GoldSrcServer extends GameServer {
      * @throws SteamCondenserException if the request fails
      * @throws TimeoutException if the request times out
      */
-    public String rconExec(String command)
-            throws TimeoutException, SteamCondenserException {
-        return ((GoldSrcSocket) this.socket).rconExec(this.rconPassword, command).trim();
+    public String rconExec(String command) throws TimeoutException, SteamCondenserException {
+        if (!this.rconAuthenticated) {
+            throw new RCONNoAuthException();
+        }
+        try {
+            return ((GoldSrcSocket) this.socket).rconExec(this.rconPassword, command).trim();
+        } catch (RCONNoAuthException e) {
+            this.rconAuthenticated = false;
+            throw e;
+        }
     }
-
 }

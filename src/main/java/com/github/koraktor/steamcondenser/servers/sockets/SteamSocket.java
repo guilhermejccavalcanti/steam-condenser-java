@@ -4,7 +4,6 @@
  *
  * Copyright (c) 2008-2014, Sebastian Staudt
  */
-
 package com.github.koraktor.steamcondenser.servers.sockets;
 
 import java.io.IOException;
@@ -17,7 +16,6 @@ import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.util.concurrent.TimeoutException;
-
 import com.github.koraktor.steamcondenser.exceptions.ConnectionResetException;
 import com.github.koraktor.steamcondenser.exceptions.PacketFormatException;
 import com.github.koraktor.steamcondenser.exceptions.SteamCondenserException;
@@ -30,12 +28,14 @@ import com.github.koraktor.steamcondenser.servers.packets.SteamPacketFactory;
  *
  * @author Sebastian Staudt
  */
-abstract public class SteamSocket {
+public abstract class SteamSocket {
 
     protected static int timeout = 1000;
 
     protected ByteBuffer buffer;
+
     protected SelectableChannel channel;
+
     protected InetSocketAddress remoteSocket;
 
     /**
@@ -60,7 +60,6 @@ abstract public class SteamSocket {
     protected SteamSocket(InetAddress ipAddress, int portNumber) {
         this.buffer = ByteBuffer.allocate(1400);
         this.buffer.order(ByteOrder.LITTLE_ENDIAN);
-
         this.remoteSocket = new InetSocketAddress(ipAddress, portNumber);
     }
 
@@ -70,11 +69,9 @@ abstract public class SteamSocket {
      * @return The packet object created from the data in the buffer
      * @throws PacketFormatException if the data is not formatted correctly
      */
-    protected SteamPacket getPacketFromData()
-            throws PacketFormatException {
+    protected SteamPacket getPacketFromData() throws PacketFormatException {
         byte[] packetData = new byte[this.buffer.remaining()];
         this.buffer.get(packetData);
-
         return SteamPacketFactory.getPacketFromData(packetData);
     }
 
@@ -87,8 +84,7 @@ abstract public class SteamSocket {
      *         with the server
      * @throws TimeoutException if the request times out
      */
-    abstract public SteamPacket getReply()
-            throws SteamCondenserException, TimeoutException;
+    public abstract SteamPacket getReply() throws SteamCondenserException, TimeoutException;
 
     /**
      * Reads the given amount of data from the socket and wraps it into the
@@ -101,44 +97,37 @@ abstract public class SteamSocket {
      * @return int The number of bytes that have been read from the socket
      * @see ByteBuffer
      */
-    protected int receivePacket(int bufferLength)
-            throws SteamCondenserException, TimeoutException {
+    protected int receivePacket(int bufferLength) throws SteamCondenserException, TimeoutException {
         Selector selector = null;
         try {
             selector = Selector.open();
             this.channel.register(selector, SelectionKey.OP_READ);
-
-            if(selector.select(SteamSocket.timeout) == 0) {
+            if (selector.select(SteamSocket.timeout) == 0) {
                 throw new TimeoutException();
             }
-
             int bytesRead;
-
             if (bufferLength == 0) {
                 this.buffer.clear();
             } else {
                 this.buffer = ByteBuffer.allocate(bufferLength);
             }
-
             bytesRead = ((ReadableByteChannel) this.channel).read(this.buffer);
             if (bytesRead < 0) {
                 bytesRead = 0;
             }
-
             this.buffer.rewind();
             this.buffer.limit(bytesRead);
-
             return bytesRead;
-        } catch(IOException e) {
-            if (e.getMessage().equals("Connection reset by peer")) {
+        } catch (IOException e) {
+            if ("Connection reset by peer".equals(e.getMessage())) {
                 throw new ConnectionResetException();
             }
             throw new SteamCondenserException(e.getMessage(), e);
         } finally {
-            if(selector != null) {
+            if (selector != null) {
                 try {
                     selector.close();
-                } catch(IOException e) {
+                } catch (IOException e) {
                     throw new SteamCondenserException(e.getMessage(), e);
                 }
             }
@@ -165,6 +154,7 @@ abstract public class SteamSocket {
             if (this.channel.isOpen()) {
                 this.channel.close();
             }
-        } catch (IOException e) {}
+        } catch (IOException e) {
+        }
     }
 }

@@ -4,7 +4,6 @@
  *
  * Copyright (c) 2008-2013, Sebastian Staudt
  */
-
 package com.github.koraktor.steamcondenser.servers.sockets;
 
 import java.net.InetAddress;
@@ -12,7 +11,6 @@ import java.util.ArrayList;
 import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.github.koraktor.steamcondenser.exceptions.RCONBanException;
 import com.github.koraktor.steamcondenser.exceptions.RCONNoAuthException;
 import com.github.koraktor.steamcondenser.exceptions.SteamCondenserException;
@@ -32,6 +30,7 @@ public class GoldSrcSocket extends QuerySocket {
     protected static final Logger LOG = LoggerFactory.getLogger(GoldSrcSocket.class);
 
     protected boolean isHLTV;
+
     protected long rconChallenge = -1;
 
     /**
@@ -42,8 +41,7 @@ public class GoldSrcSocket extends QuerySocket {
      * @param portNumber The port the server is listening on
      * @throws SteamCondenserException if the socket cannot be opened
      */
-    public GoldSrcSocket(InetAddress ipAddress, int portNumber)
-            throws SteamCondenserException {
+    public GoldSrcSocket(InetAddress ipAddress, int portNumber) throws SteamCondenserException {
         super(ipAddress, portNumber);
         this.isHLTV = false;
     }
@@ -59,8 +57,7 @@ public class GoldSrcSocket extends QuerySocket {
      *        increases compatibility.
      * @throws SteamCondenserException if the socket cannot be opened
      */
-    public GoldSrcSocket(InetAddress ipAddress, int portNumber, boolean isHLTV)
-            throws SteamCondenserException {
+    public GoldSrcSocket(InetAddress ipAddress, int portNumber, boolean isHLTV) throws SteamCondenserException {
         super(ipAddress, portNumber);
         this.isHLTV = isHLTV;
     }
@@ -77,51 +74,41 @@ public class GoldSrcSocket extends QuerySocket {
      *         with the server
      * @throws TimeoutException if the request times out
      */
-    public SteamPacket getReply()
-            throws SteamCondenserException, TimeoutException {
+    public SteamPacket getReply() throws SteamCondenserException, TimeoutException {
         int bytesRead;
         SteamPacket packet;
-
         bytesRead = this.receivePacket(1400);
-
-        if(this.packetIsSplit()) {
+        if (this.packetIsSplit()) {
             byte[] splitData;
             int packetCount, packetNumber;
             int requestId;
             byte packetNumberAndCount;
             ArrayList<byte[]> splitPackets = new ArrayList<byte[]>();
-
             do {
                 requestId = Integer.reverseBytes(this.buffer.getInt());
                 packetNumberAndCount = this.buffer.get();
                 packetCount = packetNumberAndCount & 0xF;
                 packetNumber = (packetNumberAndCount >> 4) + 1;
-
                 splitData = new byte[this.buffer.remaining()];
                 this.buffer.get(splitData);
                 splitPackets.ensureCapacity(packetCount);
                 splitPackets.add(packetNumber - 1, splitData);
-
                 LOG.info("Received packet #" + packetNumber + " of " + packetCount + " for request ID " + requestId + ".");
-
-                if(splitPackets.size() < packetCount) {
+                if (splitPackets.size() < packetCount) {
                     try {
                         bytesRead = this.receivePacket();
-                    } catch(TimeoutException e) {
+                    } catch (TimeoutException e) {
                         bytesRead = 0;
                     }
                 } else {
                     bytesRead = 0;
                 }
-            } while(bytesRead > 0 && this.packetIsSplit());
-
+            } while (bytesRead > 0 && this.packetIsSplit());
             packet = SteamPacketFactory.reassemblePacket(splitPackets);
         } else {
             packet = this.getPacketFromData();
         }
-
         LOG.info("Received packet of type \"" + packet.getClass().getSimpleName() + "\"");
-
         return packet;
     }
 
@@ -140,38 +127,32 @@ public class GoldSrcSocket extends QuerySocket {
      *         with the server
      * @throws TimeoutException if the request times out
      */
-    public String rconExec(String password, String command)
-            throws TimeoutException, SteamCondenserException {
-        if(this.rconChallenge == -1 || this.isHLTV) {
+    public String rconExec(String password, String command) throws TimeoutException, SteamCondenserException {
+        if (this.rconChallenge == -1 || this.isHLTV) {
             this.rconGetChallenge();
         }
-
         this.rconSend("rcon " + this.rconChallenge + " " + password + " " + command);
-        this.rconSend("rcon " + this.rconChallenge + " " + password);
         String response;
-        if(this.isHLTV) {
+        if (this.isHLTV) {
             try {
-                response = ((RCONGoldSrcResponsePacket)this.getReply()).getResponse();
-            } catch(TimeoutException e) {
+                response = ((RCONGoldSrcResponsePacket) this.getReply()).getResponse();
+            } catch (TimeoutException e) {
                 response = "";
             }
         } else {
-            response = ((RCONGoldSrcResponsePacket)this.getReply()).getResponse();
+            response = ((RCONGoldSrcResponsePacket) this.getReply()).getResponse();
         }
-
-
-        if(response.trim().equals("Bad rcon_password")) {
+        if (response.trim().equals("Bad rcon_password.")) {
             throw new RCONNoAuthException();
-        } else if(response.trim().equals("You have been banned from this server")) {
+        } else if (response.trim().equals("You have been banned from this server")) {
             throw new RCONBanException();
         }
-
+        this.rconSend("rcon " + this.rconChallenge + " " + password);
         String responsePart;
         do {
-            responsePart = ((RCONGoldSrcResponsePacket)this.getReply()).getResponse();
+            responsePart = ((RCONGoldSrcResponsePacket) this.getReply()).getResponse();
             response += responsePart;
-        } while(responsePart.length() > 0);
-
+        } while (responsePart.length() > 0);
         return response;
     }
 
@@ -186,15 +167,12 @@ public class GoldSrcSocket extends QuerySocket {
      *         on the game server
      * @throws TimeoutException if the request times out
      */
-    public void rconGetChallenge()
-            throws SteamCondenserException, TimeoutException {
+    public void rconGetChallenge() throws SteamCondenserException, TimeoutException {
         this.rconSend("challenge rcon");
-
-        String response = ((RCONGoldSrcResponsePacket)this.getReply()).getResponse().trim();
-        if(response.equals("You have been banned from this server.")) {
+        String response = ((RCONGoldSrcResponsePacket) this.getReply()).getResponse().trim();
+        if (response.equals("You have been banned from this server.")) {
             throw new RCONBanException();
         }
-
         this.rconChallenge = Long.valueOf(response.substring(14));
     }
 
@@ -206,8 +184,7 @@ public class GoldSrcSocket extends QuerySocket {
      * @throws SteamCondenserException if an error occured while writing to the
      *         socket
      */
-    protected void rconSend(String command)
-            throws SteamCondenserException {
+    protected void rconSend(String command) throws SteamCondenserException {
         this.send(new RCONGoldSrcRequestPacket(command));
     }
 }
